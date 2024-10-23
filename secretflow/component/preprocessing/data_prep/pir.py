@@ -10,6 +10,7 @@ from secretflow.component.data_utils import (
 )
 from secretflow.device.device.spu import SPU
 
+# 声明组件
 pir_comp = Component(
     "pir",
     domain="data_prep",
@@ -139,7 +140,7 @@ def pir_eval_fn(
             server=server_node_name,         # 服务方node_name
             input_path=input_path,           # 服务方数据路径
             key_columns=key_columns,         # key列
-            label_columns=label_columns,
+            label_columns=label_columns,     # label列
             oprf_key_path=server_oprf_key,   # 服务方 secret key 路径
             setup_path=server_setup,         # 中间结果存储路径
             num_per_query=2,                 # 服务方每次处理的query数量
@@ -148,12 +149,12 @@ def pir_eval_fn(
         )
 
         spu.pir_query(
-            server=server_node_name,
-            client=client_node_name,
-            server_setup_path=server_setup,
-            client_key_columns=key_columns,
-            client_input_path=client_query_data_path,
-            client_output_path=pir_result,
+            server=server_node_name,         # 服务方node_name
+            client=client_node_name,         # 查询方node_name
+            server_setup_path=server_setup,  # 服务方 中间结果存储路径
+            client_key_columns=key_columns,  # 查询方 key列
+            client_input_path=client_query_data_path, # 查询方数据路径
+            client_output_path=pir_result,   # 结果路径
         )
 
 

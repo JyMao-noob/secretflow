@@ -359,6 +359,69 @@
     },
     {
       "domain": "data_prep",
+      "name": "pir",
+      "desc": "PIR between two parties.",
+      "version": "0.0.1",
+      "attrs": [
+        {
+          "name": "client_node_name",
+          "desc": "Which party is pir client",
+          "type": "AT_STRING",
+          "atomic": {}
+        },
+        {
+          "name": "server_node_name",
+          "desc": "Which party is pir server",
+          "type": "AT_STRING",
+          "atomic": {}
+        },
+        {
+          "name": "client_query_data_path",
+          "desc": "Client's query input path",
+          "type": "AT_STRING",
+          "atomic": {}
+        },
+        {
+          "name": "server_data_path",
+          "desc": "Server's CSV file path. comma separated and contains header.",
+          "type": "AT_STRING",
+          "atomic": {}
+        },
+        {
+          "name": "key_columns",
+          "desc": "Column(s) used as pir key",
+          "type": "AT_STRING",
+          "atomic": {}
+        },
+        {
+          "name": "label_columns",
+          "desc": "Column(s) used as pir label",
+          "type": "AT_STRING",
+          "atomic": {}
+        }
+      ],
+      "inputs": [
+        {
+          "name": "input_data",
+          "desc": "Input vertical table.",
+          "types": [
+            "sf.table.vertical_table",
+            "sf.table.individual"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pir_output",
+          "desc": "Output vertical table",
+          "types": [
+            "sf.table.vertical_table"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "data_prep",
       "name": "psi",
       "desc": "PSI between two parties.",
       "version": "0.0.5",

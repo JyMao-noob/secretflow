@@ -71,6 +71,28 @@
     "reports": "报告",
     "Output sample reports": "输出采样报告"
   },
+  "data_prep/pir:0.0.1": {
+    "data_prep": "data_prep",
+    "pir": "倍数",
+    "PIR between two parties.": "双方之间的PIR。",
+    "0.0.1": "0.0.1",
+    "client_node_name": "客户端名称",
+    "Which party is pir client": "哪一方是我的客户",
+    "server_node_name": "服务器名称",
+    "Which party is pir server": "哪一方是pir服务器",
+    "client_query_data_path": "客户端查询数据路径",
+    "Client's query input path": "客户端的查询输入路径",
+    "server_data_path": "服务器数据路径",
+    "Server's CSV file path. comma separated and contains header.": "服务器的CSV文件路径。逗号分隔，包含标题。",
+    "key_columns": "key_columns",
+    "Column(s) used as pir key": "用作pir键的列",
+    "label_columns": "标签_列",
+    "Column(s) used as pir label": "用作pir标签的列",
+    "input_data": "输入数据",
+    "Input vertical table.": "输入垂直表格。",
+    "pir_output": "pir_输出",
+    "Output vertical table": "输出垂直表"
+  },
   "data_prep/psi:0.0.5": {
     "data_prep": "数据准备",
     "psi": "隐私求交",
