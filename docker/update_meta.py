@@ -39,7 +39,7 @@ def translate(input, translator):
             comp_translation[k] = (
                 v
                 if v != ""
-                else ts.translate_text(k, to_language=LANG, translator=translator)
+                else ts.translate_text(k, from_language='en', to_language=LANG, translator=translator)
             )
 
         output[comp] = comp_translation
@@ -50,7 +50,7 @@ def translate(input, translator):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Update sf component meta.")
     parser.add_argument('-s', '--skip_translate', action='store_false')
-    parser.add_argument('-t', '--translator', type=str, required=False, default="baidu")
+    parser.add_argument('-t', '--translator', type=str, required=False, default="alibaba")
     args = parser.parse_args()
 
     logging.info('1. Update secretflow comp list.')

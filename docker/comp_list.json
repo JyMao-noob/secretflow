@@ -364,49 +364,81 @@
       "version": "0.0.1",
       "attrs": [
         {
-          "name": "client_node_name",
-          "desc": "Which party is pir client",
-          "type": "AT_STRING",
-          "atomic": {}
+          "name": "num_per_query",
+          "desc": "The number of queries processed by the server each time",
+          "type": "AT_INT",
+          "atomic": {
+            "isOptional": true,
+            "defaultValue": {
+              "i64": "2"
+            },
+            "lowerBoundEnabled": true,
+            "lowerBound": {
+              "i64": "1"
+            },
+            "lowerBoundInclusive": true
+          }
         },
         {
-          "name": "server_node_name",
-          "desc": "Which party is pir server",
-          "type": "AT_STRING",
-          "atomic": {}
+          "name": "label_max_len",
+          "desc": "The limition of label length (byte)",
+          "type": "AT_INT",
+          "atomic": {
+            "isOptional": true,
+            "defaultValue": {
+              "i64": "200"
+            },
+            "lowerBoundEnabled": true,
+            "lowerBound": {
+              "i64": "20"
+            },
+            "lowerBoundInclusive": true
+          }
         },
         {
-          "name": "client_query_data_path",
-          "desc": "Client's query input path",
-          "type": "AT_STRING",
-          "atomic": {}
-        },
-        {
-          "name": "server_data_path",
-          "desc": "Server's CSV file path. comma separated and contains header.",
-          "type": "AT_STRING",
-          "atomic": {}
-        },
-        {
-          "name": "key_columns",
-          "desc": "Column(s) used as pir key",
-          "type": "AT_STRING",
-          "atomic": {}
-        },
-        {
-          "name": "label_columns",
-          "desc": "Column(s) used as pir label",
-          "type": "AT_STRING",
-          "atomic": {}
+          "name": "bucket_size",
+          "desc": "Indistinguishable degree",
+          "type": "AT_INT",
+          "atomic": {
+            "isOptional": true,
+            "defaultValue": {
+              "i64": "1000000"
+            },
+            "lowerBoundEnabled": true,
+            "lowerBound": {
+              "i64": "1000000"
+            },
+            "lowerBoundInclusive": true
+          }
         }
       ],
       "inputs": [
         {
-          "name": "input_data",
-          "desc": "Input vertical table.",
+          "name": "client_query_data_input",
+          "desc": "Individual table for query",
           "types": [
-            "sf.table.vertical_table",
             "sf.table.individual"
+          ],
+          "attrs": [
+            {
+              "name": "key",
+              "desc": "Column used to query.",
+              "colMinCntInclusive": "1"
+            }
+          ]
+        },
+        {
+          "name": "server_data_input",
+          "desc": "Individual table as server input data",
+          "types": [
+            "sf.table.individual"
+          ],
+          "attrs": [
+            {
+              "name": "label",
+              "desc": "Columns used as label.",
+              "colMinCntInclusive": "1"
+            }
           ]
         }
       ],

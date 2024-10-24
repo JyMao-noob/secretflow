@@ -1,14 +1,21 @@
+import logging
 import os
+from typing import List
 
 from secretflow.component.component import (
     CompEvalError,
     Component,
     IoType,
+    TableColParam,
 )
 from secretflow.component.data_utils import (
     DistDataType,
+    download_files,
+    extract_distdata_info,
+    merge_individuals_to_vtable,
 )
 from secretflow.device.device.spu import SPU
+from secretflow.spec.v1.data_pb2 import DistData, IndividualTable
 
 # 声明组件
 pir_comp = Component(
@@ -17,47 +24,66 @@ pir_comp = Component(
     version="0.0.1",
     desc="PIR between two parties.",
 )
-pir_comp.str_attr(
-    name="client_node_name",
-    desc="Which party is pir client",
+
+pir_comp.int_attr(
+    name="num_per_query",
+    desc="The number of queries processed by the server each time",
     is_list=False,
-    is_optional=False,
+    is_optional=True,
+    default_value=2,
+    lower_bound=1,
+    lower_bound_inclusive=True,
+    upper_bound=None,
 )
 
-pir_comp.str_attr(
-    name="server_node_name",
-    desc="Which party is pir server",
+pir_comp.int_attr(
+    name="label_max_len",
+    desc="The limition of label length (byte)",
     is_list=False,
-    is_optional=False,
+    is_optional=True,
+    default_value=200,
+    lower_bound=20,
+    lower_bound_inclusive=True,
+    upper_bound=None,
 )
 
-
-pir_comp.str_attr(
-    name="client_query_data_path",
-    desc="Client's query input path",
+pir_comp.int_attr(
+    name="bucket_size",
+    desc="Indistinguishable degree",
     is_list=False,
-    is_optional=False,
+    is_optional=True,
+    default_value=1000000,
+    lower_bound=1000000,
+    lower_bound_inclusive=True,
+    upper_bound=None,
 )
 
-pir_comp.str_attr(
-    name="server_data_path",
-    desc="Server's CSV file path. comma separated and contains header.",
-    is_list=False,
-    is_optional=False,
+pir_comp.io(
+    io_type=IoType.INPUT,
+    name="client_query_data_input",
+    desc="Individual table for query",
+    types=[DistDataType.INDIVIDUAL_TABLE],
+    col_params=[
+        TableColParam(
+            name="key",
+            desc="Column used to query.",
+            col_min_cnt_inclusive=1,
+        )
+    ],
 )
 
-pir_comp.str_attr(
-    name="key_columns",
-    desc="Column(s) used as pir key",
-    is_list=False,
-    is_optional=False,
-)
-
-pir_comp.str_attr(
-    name="label_columns",
-    desc="Column(s) used as pir label",
-    is_list=False,
-    is_optional=False,
+pir_comp.io(
+    io_type=IoType.INPUT,
+    name="server_data_input",
+    desc="Individual table as server input data",
+    types=[DistDataType.INDIVIDUAL_TABLE],
+    col_params=[
+        TableColParam(
+            name="label",
+            desc="Columns used as label.",
+            col_min_cnt_inclusive=1,
+        )
+    ],
 )
 
 pir_comp.io(
@@ -67,41 +93,67 @@ pir_comp.io(
     types=[DistDataType.VERTICAL_TABLE],
 )
 
-pir_comp.io(
-    io_type=IoType.INPUT,
-    name="input_data",
-    desc="Input vertical table.",
-    types=[DistDataType.VERTICAL_TABLE, DistDataType.INDIVIDUAL_TABLE],
-    col_params=None,
-)
+
+def get_label_scheme(x: DistData, labels: List[str]):
+    new_x = DistData()
+    if len(labels) == 0:
+        return new_x
+    new_x.CopyFrom(x)
+    assert x.type == "sf.table.individual"
+    imeta = IndividualTable()
+    assert x.meta.Unpack(imeta)
+
+    new_meta = IndividualTable()
+    names = []
+    types = []
+
+    for l, lt in zip(list(imeta.schema.labels), list(imeta.schema.label_types)):
+        names.append(l)
+        types.append(lt)
+
+    for label in labels:
+        if label not in names:
+            raise CompEvalError(f"key {label} is not found as id or feature.")
+
+    for n, t in zip(names, types):
+        if n in labels:
+            new_meta.schema.labels.append(n)
+            new_meta.schema.label_types.append(t)
+
+    logging.warning("label schemas: "+ str(list(imeta.schema.labels)))
+    new_meta.schema.labels.extend(list(imeta.schema.labels))
+    new_meta.schema.label_types.extend(list(imeta.schema.label_types))
+    new_meta.line_count = imeta.line_count
+
+    new_x.meta.Pack(new_meta)
+
+    return new_x
 
 
 @pir_comp.eval_fn
 def pir_eval_fn(
         *,
         ctx,
-        client_node_name,
-        server_node_name,
-        key_columns,
-        label_columns,
-        client_query_data_path,
-        server_data_path,
-        input_data,
+        num_per_query,
+        label_max_len,
+        bucket_size,
+        client_query_data_input,
+        client_query_data_input_key,
+        server_data_input,
+        server_data_input_label,
         pir_output,
 ):
     import logging
     logging.warning("pir start...")
-    logging.warning("pir client_node_name: " + client_node_name)
-    logging.warning("pir server_node_name: " + server_node_name)
-    logging.warning("pir key_columns: " + key_columns)
-    logging.warning("pir client_query_data_path: " + client_query_data_path)
-    logging.warning("pir server_data_path: " + server_data_path)
 
+    client_path_format = extract_distdata_info(client_query_data_input)
+    assert len(client_path_format) == 1
+    client_party = list(client_path_format.keys())[0]
+    server_path_format = extract_distdata_info(server_data_input)
+    server_party = list(server_path_format.keys())[0]
 
-    receiver_party = server_node_name
-    sender_party = client_node_name
-    logging.warning("pir receiver_party: " + receiver_party)
-    logging.warning("pir sender_party: " + sender_party)
+    logging.warning("pir server_party: " + server_party)
+    logging.warning("pir client_party: " + client_party)
 
     if ctx.spu_configs is None or len(ctx.spu_configs) == 0:
         raise CompEvalError("spu config is not found.")
@@ -109,22 +161,18 @@ def pir_eval_fn(
         raise CompEvalError("only support one spu")
     spu_config = next(iter(ctx.spu_configs.values()))
 
-    input_path = os.path.join(ctx.data_dir, server_data_path)
-
+    input_path = os.path.join(ctx.data_dir, server_path_format[server_party].uri)
     logging.warning("pir input_path: " + str(input_path))
+    logging.warning("pir key column(s): " + str(client_query_data_input_key))
+    logging.warning("pir label column(s): " + str(server_data_input_label))
 
+    client_query_path = os.path.join(ctx.data_dir, client_path_format[client_party].uri)
+    logging.warning("client query path: " + str(client_query_path))
 
     logging.warning(spu_config)
 
     spu = SPU(spu_config["cluster_def"], spu_config["link_desc"])
     logging.warning(spu_config)
-
-    uri = {
-        receiver_party: server_data_path,
-    }
-
-    # with ctx.tracer.trace_io():
-    #     download_files(ctx, uri, input_path)
 
     server_oprf_key = os.path.join(ctx.data_dir, "server_oprf_key")
     server_setup = os.path.join(ctx.data_dir, "server_setup")
@@ -134,38 +182,56 @@ def pir_eval_fn(
     logging.warning("pir server_setup: " + str(server_setup))
     logging.warning("pir pir_result: " + str(pir_result))
 
-
     with ctx.tracer.trace_running():
         spu.pir_setup(
-            server=server_node_name,         # 服务方node_name
-            input_path=input_path,           # 服务方数据路径
-            key_columns=key_columns,         # key列
-            label_columns=label_columns,     # label列
-            oprf_key_path=server_oprf_key,   # 服务方 secret key 路径
-            setup_path=server_setup,         # 中间结果存储路径
-            num_per_query=2,                 # 服务方每次处理的query数量
-            label_max_len=20,                # label长度限制(byte)
-            bucket_size=1000000              # 不可区分度,通常用百万级
+            server=server_party,
+            input_path=input_path,
+            key_columns=client_query_data_input_key,
+            label_columns=server_data_input_label,
+            oprf_key_path=server_oprf_key,
+            setup_path=server_setup,  # 中间结果存储路径
+            num_per_query=num_per_query,
+            label_max_len=label_max_len,
+            bucket_size=bucket_size
         )
 
         spu.pir_query(
-            server=server_node_name,         # 服务方node_name
-            client=client_node_name,         # 查询方node_name
-            server_setup_path=server_setup,  # 服务方 中间结果存储路径
-            client_key_columns=key_columns,  # 查询方 key列
-            client_input_path=client_query_data_path, # 查询方数据路径
-            client_output_path=pir_result,   # 结果路径
+            server=server_party,
+            client=client_party,
+            server_setup_path=server_setup,
+            client_key_columns=client_query_data_input_key,
+            client_input_path=client_query_path,
+            client_output_path=pir_result,
         )
 
+    # client_meta = IndividualTable()
+    # client_query_data_input.meta.Unpack(client_meta)
+    #
+    # server_meta = IndividualTable()
+    # server_data_input.meta.Unpack(server_meta)
+    #
+    # logging.warning("client_meta: ", client_meta)
+    # logging.warning("server_meta: ", server_meta)
 
+    output_db = DistData(
+        name=pir_output,
+        type=str(DistDataType.VERTICAL_TABLE),
+        system_info=client_query_data_input.system_info,
+        data_refs=[
+            DistData.DataRef(
+                uri=pir_output,
+                party=client_party,
+                format="csv",
+            ),
+        ],
+    )
 
+    output_db = merge_individuals_to_vtable(
+        [
+            client_query_data_input,
+            get_label_scheme(server_data_input, server_data_input_label),
+        ],
+        output_db,
+    )
 
-
-
-
-
-
-
-
-
-
+    return {"pir_output": output_db}
