@@ -15,7 +15,7 @@ from secretflow.component.data_utils import (
     merge_individuals_to_vtable,
 )
 from secretflow.device.device.spu import SPU
-from secretflow.spec.v1.data_pb2 import DistData, IndividualTable
+from secretflow.spec.v1.data_pb2 import DistData, IndividualTable, VerticalTable
 
 # 声明组件
 pir_comp = Component(
@@ -94,9 +94,9 @@ pir_comp.io(
 )
 
 
-def get_label_scheme(x: DistData, labels: List[str]):
+def get_label_scheme(x: DistData, keys: List[str], features: List[str]):
     new_x = DistData()
-    if len(labels) == 0:
+    if len(features) == 0:
         return new_x
     new_x.CopyFrom(x)
     assert x.type == "sf.table.individual"
@@ -107,22 +107,39 @@ def get_label_scheme(x: DistData, labels: List[str]):
     names = []
     types = []
 
-    for l, lt in zip(list(imeta.schema.labels), list(imeta.schema.label_types)):
-        names.append(l)
-        types.append(lt)
+    logging.warning("item.schema.ids: "+ str(list(imeta.schema.ids)))  # []
+    logging.warning("item.schema.id_types: "+ str(list(imeta.schema.id_types))) # []
+    logging.warning("item.schema.features: " + str(list(imeta.schema.features)))  # ['name','age','sex']
+    logging.warning("item.schema.feature_types: " + str(list(imeta.schema.feature_types))) # ['str','int','str']
+    logging.warning("item.schema.labels: "+ str(list(imeta.schema.labels)))   # []
+    logging.warning("item.schema.label_types: "+ str(list(imeta.schema.label_types)))  # []
 
-    for label in labels:
-        if label not in names:
-            raise CompEvalError(f"key {label} is not found as id or feature.")
+    for i, t in zip(list(imeta.schema.ids), list(imeta.schema.id_types)):
+        names.append(i)
+        types.append(t)
+
+    for f, t in zip(list(imeta.schema.features), list(imeta.schema.feature_types)):
+        names.append(f)
+        types.append(t)
+
+    for l, t in zip(list(imeta.schema.labels), list(imeta.schema.label_types)):
+        names.append(l)
+        types.append(t)
+
+    # logging.warning("names: ", names)  # ['name', 'age', 'sex']
+    # logging.warning("types: ", types)  # ['str', 'int', 'str']
+
+    for name in features:
+        if name not in names:
+            raise CompEvalError(f"key {name} is not found as id or feature.")
 
     for n, t in zip(names, types):
-        if n in labels:
-            new_meta.schema.labels.append(n)
-            new_meta.schema.label_types.append(t)
+        if n in keys or n in features:
+            new_meta.schema.features.append(n)
+            new_meta.schema.feature_types.append(t)
 
-    logging.warning("label schemas: "+ str(list(imeta.schema.labels)))
-    new_meta.schema.labels.extend(list(imeta.schema.labels))
-    new_meta.schema.label_types.extend(list(imeta.schema.label_types))
+    # new_meta.schema.labels.extend(list(imeta.schema.labels))
+    # new_meta.schema.label_types.extend(list(imeta.schema.label_types))
     new_meta.line_count = imeta.line_count
 
     new_x.meta.Pack(new_meta)
@@ -195,7 +212,7 @@ def pir_eval_fn(
             bucket_size=bucket_size
         )
 
-        spu.pir_query(
+        report = spu.pir_query(
             server=server_party,
             client=client_party,
             server_setup_path=server_setup,
@@ -213,6 +230,8 @@ def pir_eval_fn(
     # logging.warning("client_meta: ", client_meta)
     # logging.warning("server_meta: ", server_meta)
 
+    logging.warning("report: "+ str(report))
+
     output_db = DistData(
         name=pir_output,
         type=str(DistDataType.VERTICAL_TABLE),
@@ -229,9 +248,14 @@ def pir_eval_fn(
     output_db = merge_individuals_to_vtable(
         [
             client_query_data_input,
-            get_label_scheme(server_data_input, server_data_input_label),
+            get_label_scheme(server_data_input,client_query_data_input_key, server_data_input_label),
         ],
         output_db,
     )
+
+    vmeta = VerticalTable()
+    assert output_db.meta.Unpack(vmeta)
+    vmeta.line_count = report[0]['data_count']
+    output_db.meta.Pack(vmeta)
 
     return {"pir_output": output_db}
