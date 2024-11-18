@@ -381,7 +381,7 @@
         },
         {
           "name": "label_max_len",
-          "desc": "The limition of label length (byte)",
+          "desc": "The limitation of label length (byte)",
           "type": "AT_INT",
           "atomic": {
             "isOptional": true,
@@ -406,7 +406,7 @@
             },
             "lowerBoundEnabled": true,
             "lowerBound": {
-              "i64": "1000000"
+              "i64": "100000"
             },
             "lowerBoundInclusive": true
           }
@@ -421,7 +421,7 @@
           ],
           "attrs": [
             {
-              "name": "key",
+              "name": "query keys",
               "desc": "Column used to query.",
               "colMinCntInclusive": "1"
             }
@@ -435,7 +435,7 @@
           ],
           "attrs": [
             {
-              "name": "label",
+              "name": "query values",
               "desc": "Columns used as label.",
               "colMinCntInclusive": "1"
             }

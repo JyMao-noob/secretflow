@@ -38,7 +38,7 @@ pir_comp.int_attr(
 
 pir_comp.int_attr(
     name="label_max_len",
-    desc="The limition of label length (byte)",
+    desc="The limitation of label length (byte)",
     is_list=False,
     is_optional=True,
     default_value=200,
@@ -53,7 +53,7 @@ pir_comp.int_attr(
     is_list=False,
     is_optional=True,
     default_value=1000000,
-    lower_bound=1000000,
+    lower_bound=100000,
     lower_bound_inclusive=True,
     upper_bound=None,
 )
@@ -65,7 +65,7 @@ pir_comp.io(
     types=[DistDataType.INDIVIDUAL_TABLE],
     col_params=[
         TableColParam(
-            name="key",
+            name="query keys",
             desc="Column used to query.",
             col_min_cnt_inclusive=1,
         )
@@ -79,7 +79,7 @@ pir_comp.io(
     types=[DistDataType.INDIVIDUAL_TABLE],
     col_params=[
         TableColParam(
-            name="label",
+            name="query values",
             desc="Columns used as label.",
             col_min_cnt_inclusive=1,
         )
@@ -235,7 +235,8 @@ def pir_eval_fn(
     output_db = DistData(
         name=pir_output,
         type=str(DistDataType.VERTICAL_TABLE),
-        system_info=client_query_data_input.system_info,
+        # system_info=client_query_data_input.system_info,
+        system_info=server_data_input.system_info,
         data_refs=[
             DistData.DataRef(
                 uri=pir_output,
@@ -247,7 +248,7 @@ def pir_eval_fn(
 
     output_db = merge_individuals_to_vtable(
         [
-            client_query_data_input,
+            # client_query_data_input,
             get_label_scheme(server_data_input,client_query_data_input_key, server_data_input_label),
         ],
         output_db,
